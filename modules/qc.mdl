@@ -171,24 +171,6 @@ process checkDiscordantSex() {
         """
         sexclumn=\$(awk '{print \$5}' ${fam} | grep -vi -e '-9' -e 'na' | sort | uniq)
 
-        plink \
-            --bfile ${bed.baseName} \
-            --split-x ${params.build_ver} no-fail \
-            --remove ${fail_relatedness} \
-            --make-bed \
-            --out ${params.out}.temp1
-
-        plink \
-            --bfile ${params.out}.temp1 \
-            --make-bed \
-            --out ${params.out}.temp2
-
-        plink \
-            --bfile ${params.out}.temp2 \
-            --set-hh-missing \
-            --make-bed \
-            --out ${params.out}_no-related
-          
         if [ ! \$sexclumn -eq 2 ]; then
             echo ""
             echo "WARN: No Sex information present!"
@@ -198,6 +180,24 @@ process checkDiscordantSex() {
 
             touch ${params.out}_fail-sexcheck-qc.txt
         else
+            plink \
+                --bfile ${bed.baseName} \
+                --split-x ${params.build_ver} no-fail \
+                --remove ${fail_relatedness} \
+                --make-bed \
+                --out ${params.out}.temp1
+
+            plink \
+                --bfile ${params.out}.temp1 \
+                --make-bed \
+                --out ${params.out}.temp2
+
+            plink \
+                --bfile ${params.out}.temp2 \
+                --set-hh-missing \
+                --make-bed \
+                --out ${params.out}_no-related
+
             plink \
                 --bfile ${params.out}_no-related \
                 --check-sex \
@@ -343,7 +343,7 @@ process checkPoorQualityVariants() {
         # if case-control absent, diff missingness result will be empty
         # and code will not break
         ################################################################
-        plink \
+        plink2 \
             --bfile ${bed.baseName} \
             --geno ${params.geno} \
             --hwe 1e-06 \
@@ -379,7 +379,7 @@ process checkPoorQualityVariants() {
                     > ${bed.baseName}-fail-diffmissing-qc.txt
             fi
         done
-        plink \
+        plink2 \
             --bfile ${bed.baseName} \
             --geno ${params.geno} \
             --hwe 1e-06 \
@@ -411,6 +411,11 @@ process checkPalindromes() {
             path(log), \
             path("${bed.baseName}*at-cg_snps.txt")
     script:
+    if(params.keep_palindrome == true)
+        """
+        touch ${bed.baseName}-at-cg_snps.txt
+        """
+    else
         """       
         palindromic_snps.r ${bim}
         """
@@ -477,11 +482,6 @@ process performPca() {
         plink2 \
             --bfile ${bed.baseName} \
             --indep-pairwise 50 10 0.2 \
-            --king-cutoff 0.25 \
-            --maf 0.05 \
-            --out ${bed.baseName}
-        plink2 \
-            --bfile ${bed.baseName} \
             --maf 0.05 \
             --make-bed \
             --extract ${bed.baseName}.prune.in \
