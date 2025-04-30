@@ -180,6 +180,7 @@ function plink_assoc_usage() {
            --geno            : variant missing call frequency threshold [default: 0.05]
            --mind            : sample missing call frequency threshold [default: 0.10]
            --hwe             : Hardy-Weinberg equilibrium test p-value threshold [default: 1e-6]
+           --keep_related    : If added, only duplicates/monozygotic twins will be removed.
            --threads         : (optional) number of computer cpus to use  [default: 1].
            --njobs           : (optional) number of jobs to submit at once [default: 10]  [default: 5].
            --help            : print this help message.
@@ -246,7 +247,7 @@ function qc_config() { #params passed as arguments
 #check and remove config file if it exists
 [ -e ${3}-qc.config ] && rm ${3}-qc.config
 
-#qc_config $bfile $pheno_file $out $output_dir $hetlower $hetupper $maf $geno $mind $threads $njobs
+#qc_config $bfile $pheno_file $out $output_dir $hetlower $hetupper $maf $geno $mind $keep_related $threads $njobs
 echo """
 params {
   //==================================
@@ -261,8 +262,9 @@ params {
    maf              = ${7}
    geno             = ${8}
    mind             = ${9}
-   threads          = ${10}
-   njobs            = ${11}
+   keep_related     = ${10}
+   threads          = ${11}
+   njobs            = ${12}
 
   /*****************************************************************************************
   -bfile:
@@ -283,6 +285,9 @@ params {
     (optional) variant missing call frequency threshold [default: 0.05]
   -mind:
     (optional) sample missing call frequency threshold [default: 0.10]
+  -keep_related:
+    (optional) only remove duplicates/monozygotic twins and keep related individuals.
+    defaults is to remove related individuals.
   -threads:
     (optional) number of computer cpus to use  [default: 11]
   -njobs:
@@ -373,25 +378,28 @@ params {
     njobs = ${10}
 
   /*****************************************************************************************
-  -sample_list     : (optional) list of samples to include (single column, one sample ID per line) [default: NULL]
-                               If not provided, all samples will be included.
-           -vcf_dir         : (required) directory cpntaining vcf files.
-           -output_dir      : (optional) path to save output files [default: "vcf_dir/../clean/"].
-           -output_prefix: 
-	     (optional) suffix to add to output file name.
-           -min_maf: 
-	     (optional) minimum minor allele freqeuncy [default: 0.05].
-           -max_maf: 
-	     (optional) maximum minor allele freqeuncy [default: 1].
-           -r2: 
-	     (optional) minimum imputation accuray threshold [default: 0.3].
-           -r2_name: 
-	     (optional) name of imputation accuracy parameter in VCF file INFO field [default: R2].
-             Example: 'INFO' for SANGER imputation and 'R2' for most other tools.
-           -threads: 
-	     (optional) number of computer cpus to use  [default: 1].
-           -njobs: 
-	     (optional) number of jobs to submit at once [default: 10]  [default: 5].
+  ~sample_list: 
+    (optional) list of samples to include (single column, one sample ID per line).
+    [default: NULL]. If not provided, all samples will be included.
+  ~vcf_dir:
+    (required) directory cpntaining vcf files.
+  ~output_dir: 
+    (optional) path to save output files [default: "vcf_dir/../clean/"].
+  ~output_prefix: 
+    (optional) suffix to add to output file name.
+  ~min_maf: 
+    (optional) minimum minor allele freqeuncy [default: 0.05].
+  ~max_maf: 
+    (optional) maximum minor allele freqeuncy [default: 1].
+  ~r2: 
+    (optional) minimum imputation accuray threshold [default: 0.3].
+  ~r2_name: 
+    (optional) name of imputation accuracy parameter in VCF file INFO field [default: R2].
+    Example: 'INFO' for SANGER imputation and 'R2' for most other tools.
+  ~threads: 
+    (optional) number of computer cpus to use  [default: 1].
+  ~njobs: 
+    (optional) number of jobs to submit at once [default: 10]  [default: 5].
   *******************************************************************************************/
 }
 
@@ -472,7 +480,7 @@ else
             exit 1;
          fi        
 
-         prog=`getopt -a --long "help,bfile:,out:,output_dir:,pheno_file:,threads:,hetlower:,hetupper:,maf:,geno:,mind:,njobs:" -n "${0##*/}" -- "$@"`;
+         prog=`getopt -a --long "help,bfile:,out:,output_dir:,pheno_file:,threads:,hetlower:,hetupper:,maf:,geno:,mind:,keep_related,njobs:" -n "${0##*/}" -- "$@"`;
 
          #- defaults         
          bfile=NULL
@@ -483,6 +491,7 @@ else
          hetupper=NULL
 	 geno=0.05
 	 mind=0.10
+         keep_related=false
          threads=1
 	 njobs=5
          maf=0.05
@@ -501,6 +510,7 @@ else
                --maf) maf="$2"; shift 2;;
                --geno) geno="$2"; shift 2;;
 	       --mind) mind="$2"; shift 2;;
+               --keep_related) keep_related="$2"; shift;;
 	       --njobs) njobs="$2"; shift 2;;
                --help) shift; qc_usage; 1>&2; exit 1;;
                --) shift; break;;
@@ -532,6 +542,7 @@ else
 	     $maf \
 	     $geno \
 	     $mind \
+             $keep_related \
 	     $threads \
 	     $njobs
          #echo `nextflow -c ${out}-qc.config run qualitycontrol.nf -profile $profile -w ${output_dir}/work/`

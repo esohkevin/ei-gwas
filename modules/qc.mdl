@@ -96,10 +96,11 @@ process getKingFormatFile() {
 
 process checkDuplicateAndRelatedIndivs() {
     tag "checking related and duplicate individuals..."
+    label 'king'
+    label 'bigMemory'
     publishDir \
         path: "${params.output_dir}/qc/relatedness/", \
         mode: 'copy'
-    label 'king'
     input:
         tuple \
             path(bed), \
@@ -118,6 +119,7 @@ process checkDuplicateAndRelatedIndivs() {
             -b ${bed} \
             --ibdseg \
             --degree 4 \
+            --cpus ${task.cpus} \
             --rplot \
             --prefix ${params.out}_king
 
@@ -481,11 +483,12 @@ process performPca() {
             --bfile ${bed.baseName} \
             --indep-pairwise 50 10 0.2 \
             --maf 0.05 \
-            --out ${bed.baseName}
-        plink2 \
-            --bfile ${bed.baseName} \
-            --maf 0.01 \
+            --make-bed \
             --extract ${bed.baseName}.prune.in \
+            --keep ${bed.baseName}.king.cutoff.in.id \
+            --out pca
+        plink2 \
+            --bfile pca \
             --pca 10 \
             --out ${bed.baseName}
         sed 's/#//1' ${bed.baseName}.eigenvec > ${bed.baseName}.eigenvec.txt
