@@ -138,6 +138,7 @@ function idat_usage() {
            --out                 : output prefix [default: myout].
            --output_dir          : path to save output files [required].
            --threads             : number of computer cpus to use [default: 8].
+           --njobs               : (optional) number of jobs to submit at once [default: 10]  [default: 5].
            --help                : print this help message.
 
    """
@@ -427,7 +428,7 @@ else
             exit 1;
          fi
 
-         prog=`getopt -a --long "help,bpm_manifest:,csv_manifest:,cluster_file:,fasta:,bam_alignment:,out:,output_dir:,threads:" -n "${0##*/}" -- "$@"`;
+         prog=`getopt -a --long "help,idat_dir:,bpm_manifest:,csv_manifest:,cluster_file:,fasta:,bam_alignment:,out:,output_dir:,threads:,njobs:" -n "${0##*/}" -- "$@"`;
          
          # defaults
          indir=NULL
@@ -439,6 +440,7 @@ else
          out=myout
          output_dir="$(pwd)/output/"
          thrds=8
+         njobs=5
          
          eval set -- "$prog"
 
@@ -453,6 +455,7 @@ else
                --out) out="$2"; shift 2;;
                --output_dir) output_dir="$2"; shift 2;;
                --threads) thrds="$2"; shift 2;;
+               --njobs) njobs="$2"; shift 2;;
                --help) shift; idat_usage; 1>&2; exit 1;;
                --) shift; break;;
                *) shift; idat_usage; 1>&2; exit 1;;

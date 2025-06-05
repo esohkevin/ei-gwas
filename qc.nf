@@ -19,6 +19,11 @@ include {
     removePoorQualityVariants;
     performPca;
     plotPca;
+    getPed;
+    getParams;
+    getEigenstratgeno;
+    prunePopOutliers;
+    getPrunedData;
 } from "${projectDir}/modules/qc.mdl"
 
 workflow {
@@ -51,6 +56,18 @@ workflow {
     performPca(bed_pass_qc)
         .set { evec_eval }
     plotPca(evec_eval)
+
+    if(params.prune_outliers == true) {
+        getPed( bed_pass_qc )
+            .set { ped }
+        getParams( ped )
+            .set { ped_params }
+        getEigenstratgeno( ped_params )
+            .set { eigenstratgeno }
+        prunePopOutliers( eigenstratgeno )
+            .set { pruned_ids }
+        getPrunedData( bed_pass_qc, pruned_ids )      
+    }
 }
 
 workflow.onComplete {

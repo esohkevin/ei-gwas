@@ -45,8 +45,6 @@ process getNewVcf() {
         """
         bcftools \
             view \
-            -v snps,indels \
-            -m2 -M2 \
             -i "INFO/${params.r2_name} >= ${params.r2}" \
             --min-af ${params.maf} \
             --max-af ${params.max_af} \
@@ -61,8 +59,6 @@ process getNewVcf() {
             view \
             --force-samples \
             -S ${params.sample_list} \
-            -v snps,indels \
-            -m2 -M2 \
             -i "INFO/${params.r2_name} >= ${params.r2}" \
             --min-af ${params.maf} \
             --max-af ${params.max_af} \
@@ -101,10 +97,7 @@ process fixVcf() {
         bcftools \
             view \
             --threads ${task.cpus} \
-            -v snps,indels \
-            -m 2 \
-            -M 2 \
-            -O z | \
+            -Oz | \
             tee chr${chrom}.${params.output_prefix}.dose.vcf.gz | \
         bcftools \
             index \

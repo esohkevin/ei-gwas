@@ -74,8 +74,8 @@ def get_chain_file() {
 ***********************************************/
 
 
-process convert_idat_to_gtc() {
-  tag "processing ${intensity}"
+process getGtc() {
+  tag "processing ${idat}"
   label 'idat_to_gtc'
   label 'gencall'
   publishDir \
@@ -84,7 +84,7 @@ process convert_idat_to_gtc() {
     tuple \
       path(manifest), \
       path(cluster), \
-      path(intensity)
+      path(idat)
   output:
     path "*.gtc"
   script:
@@ -106,7 +106,7 @@ process get_gtc_list() {
     """
 }
 
-process convert_gtc_to_vcf_hg19() {
+process gtcToVcf() {
   tag "processing GTC2VCF"
   label 'gencall'
   label 'gtc_to_vcf'
@@ -124,7 +124,7 @@ process convert_gtc_to_vcf_hg19() {
     template "convert_gtc2vcf_hg19.sh"
 }
 
-process convert_gtc_to_vcf_hg38() {
+process gtcToVcfHg38() {
   tag "processing GTC2VCF"
   label 'gencall'
   label 'gtc_to_vcf'

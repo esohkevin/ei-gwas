@@ -6,6 +6,7 @@ def jobCompletionMessage() {
           Duration    : ${workflow.duration}
           Success     : ${workflow.success}
           workDir     : ${workflow.workDir}
+          outputDir   : ${params.output_dir}
           exit status : ${workflow.exitStatus}
           """
           .stripIndent()
@@ -83,12 +84,15 @@ process getKingFormatFile() {
             path("${params.out}_king.bed"), \
             path("${params.out}_king.bim"), \
             path("${params.out}_king.fam"), \
+            path("${params.out}_king.imiss"), \
             path("${params.out}_king.log")
     script:
         """
         plink \
             --bfile ${bed.baseName} \
             --make-bed \
+            --missing \
+            --allow-no-sex \
             --threads ${task.cpus} \
             --out ${params.out}_king
         """
@@ -106,15 +110,18 @@ process checkDuplicateAndRelatedIndivs() {
             path(bed), \
             path(bim), \
             path(fam), \
+            path(imiss), \
             path(log)
     output:
         tuple \
-            path("${params.out}_fail-king-check.txt"), \
+            path("${params.out}_fail-king-check_selected.txt"), \
+            path("${params.out}_fail-king-check_selected_with_pheno.txt"), \
             path("${params.out}_king.seg"), \
             path("${params.out}_king_ibd1vsibd2.ps")
     script:
     if(params.keep_related == false)
         """
+        awk '{print \$1,\$2,\$6}' ${imiss} > ${imiss}.txt
         king \
             -b ${bed} \
             --ibdseg \
@@ -123,12 +130,26 @@ process checkDuplicateAndRelatedIndivs() {
             --rplot \
             --prefix ${params.out}_king
 
-        awk '(\$8 == "Dup/MZ") || (\$8 == "FS") || (\$8 == "PO") || (\$8 == "2nd") {print \$1,\$2}' ${params.out}_king.seg | \
-        sort | \
+        awk '(\$8 == "Dup/MZ") || (\$8 == "FS") || (\$8 == "PO") || (\$8 == "2nd") {print \$1,\$3}' ${params.out}_king.seg | \
+        sort | sed 's/\\t/ /g' | \
         uniq > ${params.out}_fail-king-check.txt
+
+        if [[ ! ${params.pheno_file} = "NULL" ]]; then
+            sed -i 's/\\t/ /g' ${params.pheno_file}
+            select_related_samples.py \
+                ${params.out}_fail-king-check.txt \
+                ${params.pheno_file} \
+                ${imiss}.txt \
+                ${params.out}_fail-king-check_selected.txt
+        else
+            awk '{print \$1,\$2}' \
+               ${params.out}_fail-king-check.txt \
+               > ${params.out}_fail-king-check_selected.txt
+        fi
         """
     else
         """
+        awk '{print \$1,\$2,\$6}' ${imiss} > ${imiss}.txt        
         king \
             -b ${bed} \
             --ibdseg \
@@ -136,14 +157,27 @@ process checkDuplicateAndRelatedIndivs() {
             --rplot \
             --prefix ${params.out}_king
 
-        awk '(\$8 == "Dup/MZ") {print \$1,\$2}' ${params.out}_king.seg | \
-        sort | \
+        awk '(\$8 == "Dup/MZ") {print \$1,\$3}' ${params.out}_king.seg | \
+        sort | sed 's/\\t/ /g' | \
         uniq > ${params.out}_fail-king-check.txt
+
+        if [[ ! ${params.pheno_file} = "NULL" ]]; then
+            sed -i 's/\\t/ /g' ${params.pheno_file}
+            select_related_samples.py \
+                ${params.out}_fail-king-check.txt \
+                ${params.pheno_file} \
+                ${imiss}.txt \
+                ${params.out}_fail-king-check_selected.txt
+        else
+            awk '{print \$1,\$2}' \
+               ${params.out}_fail-king-check.txt \
+               > ${params.out}_fail-king-check_selected.txt
+        fi
         """
 }
 
 process checkDiscordantSex() {
-    debug true
+    //debug true
     tag "checking discordant sex..."
     publishDir \
         pattern: "${params.out}_fail-sexcheck-qc.txt", \
@@ -158,6 +192,7 @@ process checkDiscordantSex() {
             path(log)
         tuple \
             path(fail_relatedness), \
+            path(king_ids_with_pheno), \
             path(king_seg), \
             path(king_plot)
     output:
@@ -169,17 +204,17 @@ process checkDiscordantSex() {
             path("${params.out}_fail-sexcheck-qc.txt")
     script:
         """
-        sexclumn=\$(awk '{print \$5}' ${fam} | grep -vi -e '-9' -e 'na' | sort | uniq)
+        sexclumn=\$(awk '{print \$5}' ${fam} | sort | uniq -c)
 
         if [ ! \$sexclumn -eq 2 ]; then
             echo ""
-            echo "WARN: No Sex information present!"
+            echo "WARN: No Sex information present, or there are missing values in SEX column."
             echo "WARN: Check for discordant sex will not be performed."
-            echo "WARN: Update sex information in the input FAM file if you want this step to be performed."
+            echo "WARN: Update sex information in the input FAM file (with no missing data) if you want this step to be performed."
             echo ""
 
             touch ${params.out}_fail-sexcheck-qc.txt
-        else
+        else 
             plink \
                 --bfile ${bed.baseName} \
                 --split-x ${params.build_ver} no-fail \
@@ -484,12 +519,11 @@ process performPca() {
             --indep-pairwise 50 10 0.2 \
             --maf 0.05 \
             --make-bed \
-            --extract ${bed.baseName}.prune.in \
-            --keep ${bed.baseName}.king.cutoff.in.id \
             --out pca
         plink2 \
             --bfile pca \
             --pca 10 \
+            --extract pca.prune.in \
             --out ${bed.baseName}
         sed 's/#//1' ${bed.baseName}.eigenvec > ${bed.baseName}.eigenvec.txt
         """
@@ -509,4 +543,158 @@ process plotPca() {
         path("${evec.baseName}_pca.png")
     script:
         template 'qc_pca.r'
+}
+
+process getPed() {
+    tag "processing ${bedName}..."
+    label 'plink'
+    label 'bed2ped'
+    input:
+        tuple \
+            path(bed), \
+            path(bim), \
+            path(fam), \
+            path(vcf), \
+            path(log)
+    output:
+        tuple \
+            val(bedName), \
+            path("${bedName}.ped"), \
+            path("${bedName}.map")
+    script:
+        bedName = bed.simpleName
+        """
+        plink2 \
+            --bfile ${bedName} \
+            --indep-pairwise 50 10 0.2 \
+            --maf 0.01 \
+            --out prune-${bedName}
+
+        plink \
+            --bfile ${bedName} \
+            --keep-allele-order \
+            --recode \
+            --extract prune-${bedName}.prune.in \
+            --out ${bedName}
+        """
+}
+
+process getParams() {
+    tag "preparing parameter file for ${bedName}..."
+    label 'eigconvert'
+    input:
+        tuple \
+            val(bedName), \
+            path(ped), \
+            path(map)      
+    output:
+        tuple \
+            val(bedName), \
+            path("par.PED.PACKEDPED.${bedName}"), \
+            path(ped), \
+            path(map)
+    script:
+        template 'makeparams.sh'
+}
+
+process getEigenstratgeno() {
+    tag "converting data for ${bedName}..."
+    label 'eigensoft'
+    label 'eigconvert'
+    input:
+        tuple \
+            val(bedName), \
+            val(param), \
+            path(ped), \
+            path(map)      
+    output:
+        tuple \
+            val(bedName), \
+            path("${ped.baseName}.eigenstratgeno"), \
+            path("${ped.baseName}.snp"), \
+            path("${ped.baseName}.ind")
+    script:
+        """
+        convertf -p ${param}
+        """
+}
+
+process prunePopOutliers() {
+    tag "pruning outliers for ${bedName}..."
+    label 'eigensoft'
+    label 'eigconvert'
+    publishDir \
+        path: "${params.output_dir}/qc/outlierpruned/", \
+        mode: 'copy'
+    input:
+        tuple \
+            val(bedName), \
+            path(geno), \
+            path(snp), \
+            path(ind)      
+    output:
+        tuple \
+            val(bedName), \
+            path("${geno.baseName}-outlier-pruned.pca.evec"), \
+            path("${geno.baseName}-outlier-pruned.log"), \
+            path("${geno.baseName}-outlier-pruned.ps.pdf"), \
+            path("${geno.baseName}-outlier-pruned.eval")
+    script:
+        """
+            smartpca \
+            -i ${geno} \
+            -a ${snp} \
+            -b ${ind} \
+            -o ${bedName}-outlier-pruned.pca \
+            -l ${bedName}-outlier-pruned.log \
+            -p ${bedName}-outlier-pruned.ps \
+            -e ${bedName}-outlier-pruned.eval \
+            -k 10 \
+            -t 10 \
+            -m 5 \
+            -s 6.0
+    """
+}
+
+process getPrunedData() {
+    tag "removing poor quality snps..."
+    publishDir \
+        path: "${params.output_dir}/qc/outlierpruned/", \
+        mode: 'copy'
+    label 'plink'
+    input:
+        tuple \
+            path(bed), \
+            path(bim), \
+            path(fam), \
+            path(log), \
+            path(palindromes)
+        tuple \
+            val(bedName), \
+            path(evec), \
+            path(log), \
+            path(pdf), \
+            path(eval)
+    output:
+        tuple \
+            path("${evec.baseName}.bed"), \
+            path("${evec.baseName}.bim"), \
+            path("${evec.baseName}.fam"), \
+            path("${evec.baseName}.vcf.gz"), \
+            path("${evec.baseName}.log")
+    script:
+        """
+        awk '{print \$1,\$1}' ${evec} | \
+            sed '1d' > ${evec}.txt
+        plink2 \
+            --bfile ${bed.baseName} \
+            --keep ${evec}.txt \
+            --make-bed \
+            --out ${evec.baseName}
+
+        plink2 \
+            --bfile ${evec.baseName} \
+            --export vcf-4.2 bgz id-paste='iid' \
+            --out ${evec.baseName}
+        """
 }
