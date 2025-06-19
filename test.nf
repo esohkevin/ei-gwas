@@ -26,7 +26,7 @@ workflow {
   println ""
   
   //call_genotypes()
-  plink()
+  plink();
 	
 }
 
@@ -45,8 +45,8 @@ process call_genotypes() {
   tag "processing ... ${params.idat_dir}"
   label 'gencall'
   publishDir path: "${params.output_dir}/test"
-  //debug true
-  echo true
+  debug true
+  //echo true
   
   script:
     """		
@@ -63,8 +63,8 @@ process plink() {
   label 'plink2'
   label 'idat_to_gtc'
   publishDir path: "${params.output_dir}/output"
-  //debug true
-  echo true
+  debug true
+  //echo true
   
   script:
     """
