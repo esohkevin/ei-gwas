@@ -54,8 +54,6 @@ process call_genotypes() {
 }
 
 process plink() {
-
-  // directives
   tag "processing ... ${params.idat_dir}"
   label 'plink2'
   label 'idat_to_gtc'
@@ -65,7 +63,7 @@ process plink() {
   script:
     """
     plink2 \
-    --help \
-    --file
+      --help \
+      --file
     """
 }
