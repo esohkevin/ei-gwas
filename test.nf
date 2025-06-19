@@ -44,7 +44,6 @@ process call_genotypes() {
   label 'gencall'
   publishDir path: "${params.output_dir}/test"
   debug true
-  //echo true
   
   script:
     """		
@@ -62,7 +61,6 @@ process plink() {
   label 'idat_to_gtc'
   publishDir path: "${params.output_dir}/output"
   debug true
-  //echo true
   
   script:
     """
