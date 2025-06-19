@@ -25,14 +25,13 @@ workflow {
     .combine(cluster)
     .combine(intensity)
     .map { manifest, clustfile, idat -> tuple(manifest, clustfile, idat) }
-    .view()
     .set { idats }
 
   getGtc( idats )
     .collect()
-    .set { gtc_list }
+    .set { gtcs }
 
-  get_gtc_list( gtc_list )
+  get_gtc_list( gtcs )
     .set { gtc_file_list }
 
   if(params.build_ver == 'hg38') {

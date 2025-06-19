@@ -101,7 +101,7 @@ process getKingFormatFile() {
 process checkDuplicateAndRelatedIndivs() {
     tag "checking related and duplicate individuals..."
     label 'king'
-    label 'bigMemory'
+    label 'plink'
     publishDir \
         path: "${params.output_dir}/qc/relatedness/", \
         mode: 'copy'
@@ -145,6 +145,8 @@ process checkDuplicateAndRelatedIndivs() {
             awk '{print \$1,\$2}' \
                ${params.out}_fail-king-check.txt \
                > ${params.out}_fail-king-check_selected.txt
+            cp ${params.out}_fail-king-check_selected.txt \
+               ${params.out}_fail-king-check_selected_with_pheno.txt
         fi
         """
     else
@@ -172,6 +174,8 @@ process checkDuplicateAndRelatedIndivs() {
             awk '{print \$1,\$2}' \
                ${params.out}_fail-king-check.txt \
                > ${params.out}_fail-king-check_selected.txt
+            cp ${params.out}_fail-king-check_selected.txt \
+               ${params.out}_fail-king-check_selected_with_pheno.txt
         fi
         """
 }
@@ -204,7 +208,7 @@ process checkDiscordantSex() {
             path("${params.out}_fail-sexcheck-qc.txt")
     script:
         """
-        sexclumn=\$(awk '{print \$5}' ${fam} | sort | uniq -c)
+        sexclumn=\$(awk '{print \$5}' ${fam} | sort | uniq | wc -l)
 
         if [ ! \$sexclumn -eq 2 ]; then
             echo ""
@@ -212,6 +216,13 @@ process checkDiscordantSex() {
             echo "WARN: Check for discordant sex will not be performed."
             echo "WARN: Update sex information in the input FAM file (with no missing data) if you want this step to be performed."
             echo ""
+
+            plink \
+                --bfile ${bed.baseName} \
+                --set-hh-missing \
+                --make-bed \
+                --remove ${fail_relatedness} \
+                --out ${params.out}_no-related
 
             touch ${params.out}_fail-sexcheck-qc.txt
         else 

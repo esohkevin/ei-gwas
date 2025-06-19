@@ -57,7 +57,7 @@ workflow {
         .set { evec_eval }
     plotPca(evec_eval)
 
-    if(params.prune_outliers == true) {
+    if(params.keep_outliers == true) {
         getPed( bed_pass_qc )
             .set { ped }
         getParams( ped )

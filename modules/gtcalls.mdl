@@ -75,7 +75,7 @@ def get_chain_file() {
 
 
 process getGtc() {
-  tag "processing ${idat}"
+  tag "processing ${intensity}"
   label 'idat_to_gtc'
   label 'gencall'
   publishDir \
@@ -84,7 +84,7 @@ process getGtc() {
     tuple \
       path(manifest), \
       path(cluster), \
-      path(idat)
+      path(intensity)
   output:
     path "*.gtc"
   script:
@@ -97,12 +97,12 @@ process get_gtc_list() {
     path: "${params.output_dir}/gtcs", \
     mode: 'copy'
   input:
-    path gtc_list
+    path(gtc_list)
   output:
     path "*.txt"
   script:
     """
-    realpath ./*.gtc > gtc_list.txt
+    realpath ${params.output_dir}/gtcs/*.gtc > gtc_list.txt
     """
 }
 
