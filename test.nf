@@ -14,23 +14,21 @@ workflow {
     println "fasta_ref      = ${params.fasta_ref}"
   }
   else {
-    println "fasta_ref     = ${params.fasta_ref}"
-    println "bam_alignment = ${params.bam_alignment}"
+    println "fasta_ref      = ${params.fasta_ref}"
+    println "bam_alignment  = ${params.bam_alignment}"
   }
 
   println "output_prefix   = ${params.output_prefix}"
   println "output_dir      = ${params.output_dir}"
   println "containers_dir  = PATH WHERE CONTAINERS ARE STORED"
   println "account         = ${params.account}        # CHANGE TO YOURS"
-  println "partition       = ${params.partition}      # CHANGE TO YOURS"
+  println "partition       = ${params.queue}      # CHANGE TO YOURS"
   println ""
   
   //call_genotypes()
   plink();
 	
 }
-
-
 
 workflow.onComplete { 
   println "Workflow completed at: ${workflow.complete}"
@@ -46,7 +44,6 @@ process call_genotypes() {
   label 'gencall'
   publishDir path: "${params.output_dir}/test"
   debug true
-  //echo true
   
   script:
     """		
@@ -64,7 +61,6 @@ process plink() {
   label 'idat_to_gtc'
   publishDir path: "${params.output_dir}/output"
   debug true
-  //echo true
   
   script:
     """
