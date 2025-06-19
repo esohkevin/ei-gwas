@@ -1,17 +1,16 @@
 #!/usr/bin/env nextflow
 
 nextflow.enable.dsl = 2
-nextflow.enable.moduleBinaries = true
 
 include {
   get_manisfest_bpm;
   get_manisfest_csv;
   get_cluster_file;
   get_intensities;
-  convert_idat_to_gtc;
+  getGtc;
   get_gtc_list;
-  convert_gtc_to_vcf_hg19;
-  convert_gtc_to_vcf_hg38;
+  gtcToVcf;
+  gtcToVcfHg38
 } from "${projectDir}/modules/gtcalls.mdl"
 
 
@@ -25,16 +24,21 @@ workflow {
   manifest_bpm
     .combine(cluster)
     .combine(intensity)
-    .set { gtcall_input }
+    .map { manifest, clustfile, idat -> tuple(manifest, clustfile, idat) }
+    .set { idats }
 
-  gtc_list = convert_idat_to_gtc(gtcall_input).collect()
-  gtc_file_list = get_gtc_list(gtc_list)
+  getGtc( idats )
+    .collect()
+    .set { gtcs }
+
+  get_gtc_list( gtcs )
+    .set { gtc_file_list }
 
   if(params.build_ver == 'hg38') {
-    convert_gtc_to_vcf_hg38(gtc_file_list)
+    gtcToVcfHg38(gtc_file_list)
   }
   else {
-    convert_gtc_to_vcf_hg19(gtc_file_list)
+    gtcToVcf(gtc_file_list)
   }
 
 }

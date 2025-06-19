@@ -138,6 +138,7 @@ function idat_usage() {
            --out                 : output prefix [default: myout].
            --output_dir          : path to save output files [required].
            --threads             : number of computer cpus to use [default: 8].
+           --njobs               : (optional) number of jobs to submit at once [default: 10]  [default: 5].
            --help                : print this help message.
 
    """
@@ -238,6 +239,7 @@ params { // data-related parameters
   output_prefix     = '$7'
   output_dir        = '$8'
   threads           = $9
+  njobs             = ${10}
 }
 """ >> ${7}-idat2vcf.config
 }
@@ -263,8 +265,10 @@ params {
    geno             = ${8}
    mind             = ${9}
    keep_related     = ${10}
-   threads          = ${11}
-   njobs            = ${12}
+   keep_palindrome  = ${11}
+   keep_outliers    = ${12}
+   threads          = ${13}
+   njobs            = ${14}
 
   /*****************************************************************************************
   -bfile:
@@ -288,6 +292,10 @@ params {
   -keep_related:
     (optional) only remove duplicates/monozygotic twins and keep related individuals.
     defaults is to remove related individuals.
+  -keep_palindrome: 
+    (optional) whether to keep palindromic SNPs. By default palindromes are removed.
+  -keep_outliers:
+    (optional) whether to retain population outlier samples which are removed by default.
   -threads:
     (optional) number of computer cpus to use  [default: 11]
   -njobs:
@@ -427,7 +435,7 @@ else
             exit 1;
          fi
 
-         prog=`getopt -a --long "help,bpm_manifest:,csv_manifest:,cluster_file:,fasta:,bam_alignment:,out:,output_dir:,threads:" -n "${0##*/}" -- "$@"`;
+         prog=`getopt -a --long "help,idat_dir:,bpm_manifest:,csv_manifest:,cluster_file:,fasta:,bam_alignment:,out:,output_dir:,threads:,njobs:" -n "${0##*/}" -- "$@"`;
          
          # defaults
          indir=NULL
@@ -439,6 +447,7 @@ else
          out=myout
          output_dir="$(pwd)/output/"
          thrds=8
+         njobs=5
          
          eval set -- "$prog"
 
@@ -453,6 +462,7 @@ else
                --out) out="$2"; shift 2;;
                --output_dir) output_dir="$2"; shift 2;;
                --threads) thrds="$2"; shift 2;;
+               --njobs) njobs="$2"; shift 2;;
                --help) shift; idat_usage; 1>&2; exit 1;;
                --) shift; break;;
                *) shift; idat_usage; 1>&2; exit 1;;
@@ -465,7 +475,7 @@ else
             idat_usage 1>&2;
             exit 1;
          else
-         idat_config $indir $bpm $csv $cluster $fasta $bam $out $output_dir $thrds;
+         idat_config $indir $bpm $csv $cluster $fasta $bam $out $output_dir $thrds $njobs;
          #echo `nextflow -c ${out}-idat2vcf.config run idat2vcf.nf -profile $profile -w ${output_dir}/work/`
          fi
 
@@ -480,7 +490,7 @@ else
             exit 1;
          fi        
 
-         prog=`getopt -a --long "help,bfile:,out:,output_dir:,pheno_file:,threads:,hetlower:,hetupper:,maf:,geno:,mind:,keep_related,njobs:" -n "${0##*/}" -- "$@"`;
+         prog=`getopt -a --long "help,bfile:,out:,output_dir:,pheno_file:,threads:,hetlower:,hetupper:,maf:,geno:,mind:,keep_related,keep_outliers,keep_palindrome,njobs:" -n "${0##*/}" -- "$@"`;
 
          #- defaults         
          bfile=NULL
@@ -495,6 +505,8 @@ else
          threads=1
 	 njobs=5
          maf=0.05
+         keep_palindrome=false
+         keep_outliers=true
           
          eval set -- "$prog"
          
@@ -511,6 +523,8 @@ else
                --geno) geno="$2"; shift 2;;
 	       --mind) mind="$2"; shift 2;;
                --keep_related) keep_related="$2"; shift;;
+               --keep_palindrome) keep_palindrome="$2"; shift;;
+               --keep_outliers) keep_outliers="$2"; shift;;
 	       --njobs) njobs="$2"; shift 2;;
                --help) shift; qc_usage; 1>&2; exit 1;;
                --) shift; break;;
@@ -543,9 +557,12 @@ else
 	     $geno \
 	     $mind \
              $keep_related \
+	     $keep_palindrome \
+	     $keep_outliers \
 	     $threads \
 	     $njobs
          #echo `nextflow -c ${out}-qc.config run qualitycontrol.nf -profile $profile -w ${output_dir}/work/`
+	 echo "Configuration file created '${PWD}/${out}-qc.config'"
       ;;
       plink-assoc)
          #pass profile as argument
