@@ -158,7 +158,11 @@ function qc_usage() {
            --maf             : minor allele frequency threshold [default: 0.05].
            --geno            : variant missing call frequency threshold [default: 0.05]
 	   --mind            : sample missing call frequency threshold [default: 0.10]
-           --threads         : (optional) number of computer cpus to use  [default: 1].
+           --keep_related    : (optional) only remove duplicates/monozygotic twins and keep related individuals.
+                               default is to remove related individuals.
+           --keep_palindrome : (optional) whether to keep palindromic SNPs. By default palindromes are removed.
+           --keep_outliers   : (optional) whether to retain population outlier samples which are removed by default.        
+	   --threads         : (optional) number of computer cpus to use  [default: 1].
            --njobs           : (optional) number of jobs to submit at once [default: 10]  [default: 5].
            --help            : print this help message.
    """
